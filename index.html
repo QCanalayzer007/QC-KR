@@ -114,7 +114,15 @@
             justify-content: center;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
-        
+        .expand-transcript-container .btn {
+    background-color: var(--dark-gray) !important;
+    margin: 0 auto;
+}
+
+.expand-transcript-container .btn:hover {
+    background-color: var(--primary) !important;
+    transform: translateY(-2px);
+}
         .btn:hover {
             background-color: #008a91;
             transform: translateY(-2px);
@@ -1087,29 +1095,34 @@
             }));
             
             // Process matches
-            if (matches.length === 0) {
-                riskList.innerHTML = `
-                    <div class="no-risks">
-                        <i class="material-icons">check_circle</i>
-                        <div>No risky phrases detected in this transcript</div>
-                    </div>
-                `;
-                document.getElementById('totalRisks').textContent = '0';
-                document.getElementById('uniqueRisks').textContent = '0';
-                document.getElementById('firstRiskTime').textContent = '--:--:--';
-                document.getElementById('lastRiskTime').textContent = '--:--:--';
-                resultsContainer.style.display = 'block';
-                
-                // Store empty risks for this file
-                if (uploadedFiles.length > 0) {
-                    uploadedFiles[currentFileIndex].risks = [];
-                    uploadedFiles[currentFileIndex].checkedRisks = [];
-                    saveCheckedState();
-                }
-                
-                btn.classList.remove('analyzing');
-                return;
-            }
+           if (matches.length === 0) {
+    riskList.innerHTML = `
+        <div class="no-risks">
+            <i class="material-icons">check_circle</i>
+            <div>No risky phrases detected in this transcript</div>
+        </div>
+        <div class="expand-transcript-container" style="text-align: center; margin-top: 20px;">
+            <button class="btn" onclick="showTranscript()" style="background-color: var(--dark-gray);">
+                <i class="material-icons">visibility</i> Show Transcript
+            </button>
+        </div>
+    `;
+    document.getElementById('totalRisks').textContent = '0';
+    document.getElementById('uniqueRisks').textContent = '0';
+    document.getElementById('firstRiskTime').textContent = '--:--:--';
+    document.getElementById('lastRiskTime').textContent = '--:--:--';
+    resultsContainer.style.display = 'block';
+    
+    // Store empty risks for this file
+    if (uploadedFiles.length > 0) {
+        uploadedFiles[currentFileIndex].risks = [];
+        uploadedFiles[currentFileIndex].checkedRisks = [];
+        saveCheckedState();
+    }
+    
+    btn.classList.remove('analyzing');
+    return;
+}
             
             // Process and deduplicate matches
             const uniquePhrases = new Set();
@@ -1323,83 +1336,101 @@
             document.getElementById('resultsContainer').style.display = 'block';
         }
         
-        function highlightRisksInTranscript(riskItems) {
-            const textarea = document.getElementById('transcriptInput');
-            const text = textarea.value;
-            const regex = new RegExp(riskyPhrases.join("|"), "gi");
+       function highlightRisksInTranscript(riskItems) {
+    const textarea = document.getElementById('transcriptInput');
+    const text = textarea.value;
+    
+    // Remove any existing highlight container
+    const existingHighlight = document.getElementById('highlightContainer');
+    if (existingHighlight) {
+        existingHighlight.remove();
+    }
+    
+    // If no risks and no text, return early
+    if ((!riskItems || riskItems.length === 0) && !text) return;
+    
+    // Create a document fragment to work with
+    const fragment = document.createElement('div');
+    
+    // If we have risks, process them
+    if (riskItems && riskItems.length > 0) {
+        const regex = new RegExp(riskyPhrases.join("|"), "gi");
+        let lastIndex = 0;
+        const matches = [...text.matchAll(regex)];
+        
+        matches.forEach((match, matchIndex) => {
+            // Add text before match
+            fragment.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
             
-            // Remove any existing highlight container
-            const existingHighlight = document.getElementById('highlightContainer');
-            if (existingHighlight) {
-                existingHighlight.remove();
-            }
-            
-            // Create a document fragment to work with
-            const fragment = document.createElement('div');
-            let lastIndex = 0;
-            const matches = [...text.matchAll(regex)];
-            
-            matches.forEach((match, matchIndex) => {
-                // Add text before match
-                fragment.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+            // Add highlighted match
+            const highlight = document.createElement('span');
+            highlight.className = 'highlight';
+            highlight.textContent = match[0];
+            highlight.onclick = () => {
+                // Remove active class from all highlights
+                document.querySelectorAll('.highlight').forEach(el => {
+                    el.classList.remove('active');
+                });
+                // Add active class to clicked highlight
+                highlight.classList.add('active');
                 
-                // Add highlighted match
-                const highlight = document.createElement('span');
-                highlight.className = 'highlight';
-                highlight.textContent = match[0];
-                highlight.onclick = () => {
-                    // Remove active class from all highlights
-                    document.querySelectorAll('.highlight').forEach(el => {
-                        el.classList.remove('active');
-                    });
-                    // Add active class to clicked highlight
-                    highlight.classList.add('active');
-                    
-                    // Find corresponding risk item and scroll to it
-                    const riskItem = document.querySelectorAll('.risk-item')[matchIndex];
-                    if (riskItem) {
-                        riskItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                        // Flash the risk item
-                        riskItem.style.backgroundColor = 'rgba(0, 173, 181, 0.2)';
-                        setTimeout(() => {
-                            riskItem.style.backgroundColor = '';
-                        }, 2000);
-                    }
-                };
-                fragment.appendChild(highlight);
-                
-                lastIndex = match.index + match[0].length;
-            });
+                // Find corresponding risk item and scroll to it
+                const riskItem = document.querySelectorAll('.risk-item')[matchIndex];
+                if (riskItem) {
+                    riskItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    // Flash the risk item
+                    riskItem.style.backgroundColor = 'rgba(0, 173, 181, 0.2)';
+                    setTimeout(() => {
+                        riskItem.style.backgroundColor = '';
+                    }, 2000);
+                }
+            };
+            fragment.appendChild(highlight);
             
-            // Add remaining text
-            fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
-            
-            // Only update if we actually made changes
-            if (matches.length > 0) {
-                textarea.style.display = 'none';
-                
-                const highlightContainer = document.createElement('div');
-                highlightContainer.id = 'highlightContainer';
-                highlightContainer.className = 'container';
-                highlightContainer.style.marginTop = '-20px';
-                highlightContainer.style.padding = '15px';
-                highlightContainer.style.backgroundColor = 'white';
-                highlightContainer.style.borderRadius = '4px';
-                highlightContainer.style.border = '1px solid #ddd';
-                highlightContainer.innerHTML = `
-                    <div style="font-size: 14px; color: var(--dark-gray); margin-bottom: 10px;">
-                        <i class="material-icons" style="vertical-align: middle; color: var(--warning);">highlight</i>
-                        Click highlighted phrases to jump to their risk entries
-                    </div>
-                    <div style="white-space: pre-wrap;"></div>
-                `;
-                
-                highlightContainer.querySelector('div:last-child').appendChild(fragment);
-                textarea.parentNode.insertBefore(highlightContainer, textarea.nextSibling);
-            } else {
-                textarea.style.display = 'block';
-            }
+            lastIndex = match.index + match[0].length;
+        });
+        
+        // Add remaining text
+        fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
+    } else {
+        // Just show the plain text if no risks
+        fragment.appendChild(document.createTextNode(text));
+    }
+    
+    // Only update if we have text
+    if (text) {
+        textarea.style.display = 'none';
+        
+        const highlightContainer = document.createElement('div');
+        highlightContainer.id = 'highlightContainer';
+        highlightContainer.className = 'container';
+        highlightContainer.style.marginTop = '-20px';
+        highlightContainer.style.padding = '15px';
+        highlightContainer.style.backgroundColor = 'white';
+        highlightContainer.style.borderRadius = '4px';
+        highlightContainer.style.border = '1px solid #ddd';
+        
+        // Only show the helper text if we have risks
+        if (riskItems && riskItems.length > 0) {
+            highlightContainer.innerHTML = `
+                <div style="font-size: 14px; color: var(--dark-gray); margin-bottom: 10px;">
+                    <i class="material-icons" style="vertical-align: middle; color: var(--warning);">highlight</i>
+                    Click highlighted phrases to jump to their risk entries
+                </div>
+                <div style="white-space: pre-wrap;"></div>
+            `;
+        } else {
+            highlightContainer.innerHTML = `
+                <div style="white-space: pre-wrap;"></div>
+            `;
         }
+        
+        highlightContainer.querySelector('div:last-child').appendChild(fragment);
+        textarea.parentNode.insertBefore(highlightContainer, textarea.nextSibling);
+    } else {
+        textarea.style.display = 'block';
+    }
+}
         
         function highlightRiskInText(matchIndex) {
             // Remove active class from all highlights
@@ -1518,15 +1549,27 @@
             }
         });
         // Toggle dark mode for transcript only
-document.getElementById('themeToggle').addEventListener('change', function () {
-    const body = document.body;
-    const icon = document.getElementById('themeIcon');
+// Dark mode toggle with localStorage
+const themeToggle = document.getElementById('themeToggle');
+const themeIcon = document.getElementById('themeIcon');
+
+// Check for saved theme preference
+const savedTheme = localStorage.getItem('darkTranscript');
+if (savedTheme === 'true') {
+    document.body.classList.add('dark-transcript');
+    themeToggle.checked = true;
+    themeIcon.textContent = 'dark_mode';
+}
+
+themeToggle.addEventListener('change', function() {
     if (this.checked) {
-        body.classList.add('dark-transcript');
-        icon.textContent = 'dark_mode';  // 🌙
+        document.body.classList.add('dark-transcript');
+        themeIcon.textContent = 'dark_mode';
+        localStorage.setItem('darkTranscript', 'true');
     } else {
-        body.classList.remove('dark-transcript');
-        icon.textContent = 'light_mode'; // 🌞
+        document.body.classList.remove('dark-transcript');
+        themeIcon.textContent = 'light_mode';
+        localStorage.setItem('darkTranscript', 'false');
     }
 });
 function switchLanguage(lang) {
@@ -1538,10 +1581,40 @@ function switchLanguage(lang) {
         window.location.href = 'https://qcanalayzer007.github.io/QC-KR/';
     }
 }
+function showTranscript() {
+    const transcript = document.getElementById('transcriptInput').value.trim();
+    if (!transcript) return;
+    
+    // Create a temporary array to trigger highlighting
+    const tempRisks = [
+        {
+            phrase: "",
+            time: null,
+            index: 0,
+            matchIndex: 0
+        }
+    ];
+    
+    highlightRisksInTranscript(tempRisks);
+    
+    // Scroll to the transcript
+    const highlightContainer = document.getElementById('highlightContainer');
+    if (highlightContainer) {
+        highlightContainer.scrollIntoView({ behavior: 'smooth' });
+    }
+    
+    // Remove the button after showing
+    const expandContainer = document.querySelector('.expand-transcript-container');
+    if (expandContainer) {
+        expandContainer.remove();
+    }
+}
 
     </script>
 </body>
 </html>
+
+
 
 
 
